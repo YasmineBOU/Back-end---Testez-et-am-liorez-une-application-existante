@@ -22,6 +22,9 @@ public class SpringSecurityConfig {
     @Autowired
     private CustomUserDetailService customUserDetailService;
 
+    @Autowired
+    private JwtAuthenticationFilter jwtAuthenticationFilter;
+
     @Bean
     public DaoAuthenticationProvider authenticationProvider() {
         DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
@@ -54,7 +57,7 @@ public class SpringSecurityConfig {
                         // Others protected routes will be added here.
                         .anyRequest().authenticated()
                 )
-                // .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtAuthenticationFilter, org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(exceptionHandling -> exceptionHandling.authenticationEntryPoint(
                         (request, response, exception) -> {
                             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, exception.getMessage());

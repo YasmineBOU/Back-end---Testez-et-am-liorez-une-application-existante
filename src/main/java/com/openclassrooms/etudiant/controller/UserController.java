@@ -1,26 +1,35 @@
 package com.openclassrooms.etudiant.controller;
 
+import com.openclassrooms.etudiant.dto.AddUserRequestDTO;
+import com.openclassrooms.etudiant.dto.ReadRequestDTO;
+import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
+import com.openclassrooms.etudiant.dto.DeleteRequestDTO;
 import com.openclassrooms.etudiant.dto.LoginRequestDTO;
 import com.openclassrooms.etudiant.dto.RegisterDTO;
+import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.mapper.UserDtoMapper;
 import com.openclassrooms.etudiant.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 import java.util.Map;
-
+import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j // to delete after debugging
 @RestController
 @RequestMapping
 @RequiredArgsConstructor
 public class UserController {
-
+    
     private final UserService userService;
     private final UserDtoMapper userDtoMapper;
 
@@ -33,8 +42,62 @@ public class UserController {
     @PostMapping("/api/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequestDTO loginRequestDTO) {
         String jwtToken = userService.login(loginRequestDTO.getLogin(), loginRequestDTO.getPassword());
-        return ResponseEntity.ok(Map.of("token", jwtToken));
+        log.info("Token: '{}'", jwtToken);
+        return ResponseEntity.ok(Map.of("token", jwtToken, "message", "Logged successfully !"));
+    }
+    @PostMapping("/api/add-user")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> addUser(
+            @Valid @RequestBody AddUserRequestDTO addUserRequestDTO,
+            @AuthenticationPrincipal User authenticatedUser) {
+        
+        try {
+            // Validate authenticated user exists
+            if (authenticatedUser == null) {
+                log.info("Authentication context missing");
+                return new ResponseEntity<>(
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED
+                );
+            }
+            log.info("Authenticated user: {}", authenticatedUser.getLogin());
+            
+            // Map DTO to entity
+            User newUser = userDtoMapper.toEntity(addUserRequestDTO);
+            log.info("Adding new user with login: {}", newUser.getLogin());
+            // Call service to add user
+            User createdUser = userService.addUser(newUser, authenticatedUser);
+            log.info("User '{}' added successfully with ID: {}", createdUser.getLogin(), createdUser.getId());
+            // Return success response (201 Created)
+            return new ResponseEntity<>(
+                Map.of(
+                    "message", "User created successfully",
+                    "userId", createdUser.getId(),
+                    "login", createdUser.getLogin()
+                ),
+                HttpStatus.CREATED
+            );
+            
+        } catch (IllegalArgumentException e) {
+            // Handles: duplicate login
+            log.info("(Duplicate login)Error adding user: {}", e.getMessage());
+            return new ResponseEntity<>(
+                Map.of("error", e.getMessage()),
+                HttpStatus.BAD_REQUEST
+            );
+        } catch (IllegalStateException e) {
+            // Handles: missing authentication context
+            log.info("(Missing authentication context) Error adding user: {}", e.getMessage());
+            return new ResponseEntity<>(
+                Map.of("error", "Authentication required"),
+                HttpStatus.UNAUTHORIZED
+            );
+        }
     }
 
+    // @PostMapping("/api/read_user")
+    // public ResponseEntity<?> readUser(@Valid @RequestBody ReadRequestDTO readRequestDTO){
+    //     // TODO: implement read user logic
+    // }
 
 }
