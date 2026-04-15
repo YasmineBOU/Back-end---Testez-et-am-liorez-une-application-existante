@@ -6,6 +6,7 @@ import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
 import com.openclassrooms.etudiant.dto.DeleteRequestDTO;
 import com.openclassrooms.etudiant.dto.LoginRequestDTO;
 import com.openclassrooms.etudiant.dto.RegisterDTO;
+import com.openclassrooms.etudiant.dto.UserSummaryDTO;
 import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.mapper.UserDtoMapper;
 import com.openclassrooms.etudiant.service.UserService;
@@ -19,6 +20,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,7 +52,8 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> addUser(
             @Valid @RequestBody AddUserRequestDTO addUserRequestDTO,
-            @AuthenticationPrincipal User authenticatedUser) {
+            @AuthenticationPrincipal User authenticatedUser
+    ) {
         
         try {
             // Validate authenticated user exists
@@ -95,9 +99,60 @@ public class UserController {
         }
     }
 
-    // @PostMapping("/api/read_user")
-    // public ResponseEntity<?> readUser(@Valid @RequestBody ReadRequestDTO readRequestDTO){
-    //     // TODO: implement read user logic
-    // }
+    @GetMapping("/api/read-user")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> readUser(
+        @AuthenticationPrincipal User authenticatedUser
+    ) {
+          
+        try {
+            // Validate authenticated user exists
+            if (authenticatedUser == null) {
+                log.info("Authentication context missing");
+                return new ResponseEntity<>(
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED
+                );
+            }
+            log.info("Authenticated user: {}", authenticatedUser.getLogin());
+            Iterable<UserSummaryDTO> users = userService.getUsers(authenticatedUser);
+            return new ResponseEntity<>(users, HttpStatus.OK);
+        } catch (IllegalStateException e) {
+            // Handles: missing authentication context
+            log.info("(Missing authentication context) Error reading users: {}", e.getMessage());
+            return new ResponseEntity<>(
+                Map.of("error", "Authentication required"),
+                HttpStatus.UNAUTHORIZED
+            );
+        }        
+    }
+    @GetMapping("/api/read-user/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> readUse(
+        @AuthenticationPrincipal User authenticatedUser,
+        @PathVariable Long id
+    ) {
+          
+        try {
+            // Validate authenticated user exists
+            if (authenticatedUser == null) {
+                log.info("Authentication context missing");
+                return new ResponseEntity<>(
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED
+                );
+            }
+            log.info("Searching for user with id: {}", id);
+            UserSummaryDTO user = userService.getUserById(authenticatedUser, id);
+            return new ResponseEntity<>(user, HttpStatus.OK);
+        } catch (IllegalStateException e) {
+            // Handles: missing authentication context
+            log.info("(Missing authentication context) Error reading users: {}", e.getMessage());
+            return new ResponseEntity<>(
+                Map.of("error", "Authentication required"),
+                HttpStatus.UNAUTHORIZED
+            );
+        }        
+    }
 
 }

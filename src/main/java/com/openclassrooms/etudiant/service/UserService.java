@@ -1,5 +1,6 @@
 package com.openclassrooms.etudiant.service;
 
+import com.openclassrooms.etudiant.dto.UserSummaryDTO;
 import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.repository.UserRepository;
 import jakarta.transaction.Transactional;
@@ -98,5 +99,28 @@ public class UserService {
                  authenticatedUser.getLogin(), savedUser.getLogin());
         
         return savedUser;
+    }
+
+    public Iterable<UserSummaryDTO> getUsers(User authenticatedUser) {
+        Assert.notNull(authenticatedUser, "Authenticated user must not be null");
+        log.info("User '{}' is retrieving all users", authenticatedUser.getLogin());
+        Iterable<UserSummaryDTO> users = userRepository.findAllUserSummaries();
+        log.info("User '{}' retrieved all users: {} users", authenticatedUser.getLogin(), users.spliterator().getExactSizeIfKnown());
+        return users;
+    }
+
+    public UserSummaryDTO getUserById(User authenticatedUser, Long id) {
+        Assert.notNull(authenticatedUser, "Authenticated user must not be null");
+        Assert.notNull(id, "User ID must not be null");
+        Assert.isTrue(id > 0, "User ID must be a positive number");
+        log.info("User '{}' is retrieving information for user with id: {}", authenticatedUser.getLogin(), id);
+        UserSummaryDTO user = userRepository.findUserById(id);
+        if (user != null) {
+            log.info("User '{}' found: {}", authenticatedUser.getLogin(), user);
+            return user;
+        } else {
+            log.info("User with id '{}' not found in database", id);
+            throw new IllegalStateException("User with id " + id + " not found in database");
+        }
     }
 }

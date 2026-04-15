@@ -14,7 +14,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import com.openclassrooms.etudiant.service.JwtService;
 import com.openclassrooms.etudiant.repository.UserRepository;
 import com.openclassrooms.etudiant.entities.User;
-import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -27,11 +26,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
-
-    @PostConstruct
-    public void init() {
-        log.info("JwtAuthenticationFilter initialized");
-    }
 
     @Override
     protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request,
@@ -71,11 +65,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
             UsernamePasswordAuthenticationToken authenticationToken =
-                    new UsernamePasswordAuthenticationToken(
-                            user,
-                            null,
-                            user.getAuthorities()
-                    );
+                new UsernamePasswordAuthenticationToken(
+                    user,
+                    null,
+                    user.getAuthorities()
+            );
 
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
