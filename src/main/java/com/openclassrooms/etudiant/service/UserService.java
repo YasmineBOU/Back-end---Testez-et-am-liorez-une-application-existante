@@ -1,5 +1,6 @@
 package com.openclassrooms.etudiant.service;
 
+import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
 import com.openclassrooms.etudiant.dto.UserSummaryDTO;
 import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.repository.UserRepository;
@@ -138,5 +139,50 @@ public class UserService {
         }
     }  
 
-    
+    public void updateUser(User authenticatedUser, Long id, UpdateRequestDTO updateRequestDTO) {
+        Assert.notNull(authenticatedUser, "Authenticated user must not be null");
+        Assert.notNull(id, "User ID must not be null");
+        Assert.notNull(updateRequestDTO, "Update data must not be null");
+        Assert.isTrue(id > 0, "User ID must be a positive number");
+
+        try {
+            // Security: Log the update attempt
+            log.info("User '{}' is attempting to update user with id '{}'", authenticatedUser.getLogin(), id);
+            
+            final User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalStateException("User with id " + id + " not found in database"));
+            
+            boolean hasNewData = false;
+            
+            // Update only non-null fields from the DTO
+            if (updateRequestDTO.getFirstName() != null && !updateRequestDTO.getFirstName().trim().isEmpty()) {
+                existingUser.setFirstName(updateRequestDTO.getFirstName().trim());
+                hasNewData = true;
+            }
+            if (updateRequestDTO.getLastName() != null && !updateRequestDTO.getLastName().trim().isEmpty()) {
+                existingUser.setLastName(updateRequestDTO.getLastName().trim());
+                hasNewData = true;
+            }
+            if (updateRequestDTO.getLogin() != null && !updateRequestDTO.getLogin().trim().isEmpty()) {
+                existingUser.setLogin(updateRequestDTO.getLogin().trim());
+                hasNewData = true;
+            }
+            if (updateRequestDTO.getPassword() != null && !updateRequestDTO.getPassword().trim().isEmpty()) {
+                existingUser.setPassword(passwordEncoder.encode(updateRequestDTO.getPassword().trim()));
+                hasNewData = true;
+            }
+
+            // Preserve existing values for created_at, updated_at, etc.
+            if (hasNewData) {
+                userRepository.save(existingUser);
+                log.info("User with id '{}' successfully updated by '{}'", id, authenticatedUser.getLogin());
+            } else {    
+                log.info("No new data provided for update of user with id '{}'", id);
+            }
+        } catch (Exception e) {
+            log.error("Error during update attempt by user '{}': {}", authenticatedUser.getLogin(), e.getMessage());
+            throw e; // Re-throw after logging
+        }
+       
+    }    
 }

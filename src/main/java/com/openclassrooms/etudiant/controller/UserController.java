@@ -22,6 +22,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -185,5 +186,34 @@ public class UserController {
         }        
     }
     
-
+    @PatchMapping("/api/update-user/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> updateUser(
+        @Valid @RequestBody UpdateRequestDTO updateRequestDTO,
+        @PathVariable Long id,
+        @AuthenticationPrincipal User authenticatedUser
+        
+    ) {
+          
+        try {
+            // Validate authenticated user exists
+            if (authenticatedUser == null) {
+                log.info("Authentication context missing");
+                return new ResponseEntity<>(
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED
+                );
+            }
+            log.info("Updating user with id: {}", id);
+            userService.updateUser(authenticatedUser, id, updateRequestDTO);
+            return new ResponseEntity<>(Map.of("message", "User with id " + id + " updated successfully !"), HttpStatus.OK);
+        } catch (IllegalStateException e) {
+            // Handles: missing authentication context
+            log.info("(Missing authentication context) Error updating user: {}", e.getMessage());
+            return new ResponseEntity<>(
+                Map.of("error", "Error updating user: " + e.getMessage()),
+                HttpStatus.NOT_FOUND
+            );
+        }        
+    }
 }
