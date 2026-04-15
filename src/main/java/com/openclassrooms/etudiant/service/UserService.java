@@ -123,4 +123,20 @@ public class UserService {
             throw new IllegalStateException("User with id " + id + " not found in database");
         }
     }
+
+    public void deleteUserById(User authenticatedUser, Long id) {
+        Assert.notNull(authenticatedUser, "Authenticated user must not be null");
+        Assert.notNull(id, "User ID must not be null");
+        Assert.isTrue(id > 0, "User ID must be a positive number");
+        log.info("User '{}' is deleting user with id: {}", authenticatedUser.getLogin(), id);
+        if (userRepository.existsById(id)) {
+            userRepository.deleteById(id);
+            log.info("User with id '{}' successfully deleted by '{}'", id, authenticatedUser.getLogin());
+        } else {
+            log.info("Attempt to delete non-existent user with id: {}", id);
+            throw new IllegalStateException("User with id " + id + " not found in database");
+        }
+    }  
+
+    
 }

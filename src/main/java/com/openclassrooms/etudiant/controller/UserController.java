@@ -126,9 +126,10 @@ public class UserController {
             );
         }        
     }
+
     @GetMapping("/api/read-user/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> readUse(
+    public ResponseEntity<?> readUserById(
         @AuthenticationPrincipal User authenticatedUser,
         @PathVariable Long id
     ) {
@@ -154,5 +155,35 @@ public class UserController {
             );
         }        
     }
+    
+    @GetMapping("/api/delete-user/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> deleteUserById(
+        @AuthenticationPrincipal User authenticatedUser,
+        @PathVariable Long id
+    ) {
+          
+        try {
+            // Validate authenticated user exists
+            if (authenticatedUser == null) {
+                log.info("Authentication context missing");
+                return new ResponseEntity<>(
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED
+                );
+            }
+            log.info("Searching for user with id: {}", id);
+            userService.deleteUserById(authenticatedUser, id);
+            return new ResponseEntity<>(Map.of("message", "User with id " + id + " deleted successfully !"), HttpStatus.OK);
+        } catch (IllegalStateException e) {
+            // Handles: missing authentication context
+            log.info("(Missing authentication context) Error deleting user: {}", e.getMessage());
+            return new ResponseEntity<>(
+                Map.of("error", "Error deleting user: " + e.getMessage()),
+                HttpStatus.NOT_FOUND
+            );
+        }        
+    }
+    
 
 }
