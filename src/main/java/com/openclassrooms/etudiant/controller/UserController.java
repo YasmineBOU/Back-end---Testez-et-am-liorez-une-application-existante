@@ -1,9 +1,7 @@
 package com.openclassrooms.etudiant.controller;
 
 import com.openclassrooms.etudiant.dto.AddUserRequestDTO;
-import com.openclassrooms.etudiant.dto.ReadRequestDTO;
 import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
-import com.openclassrooms.etudiant.dto.DeleteRequestDTO;
 import com.openclassrooms.etudiant.dto.LoginRequestDTO;
 import com.openclassrooms.etudiant.dto.RegisterDTO;
 import com.openclassrooms.etudiant.dto.UserSummaryDTO;
@@ -11,10 +9,8 @@ import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.mapper.UserDtoMapper;
 import com.openclassrooms.etudiant.service.UserService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-
 import java.util.Map;
-import java.util.Optional;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
