@@ -36,6 +36,7 @@ public class UserController {
     private final UserDtoMapper userDtoMapper;
 
     private ResponseEntity<?> userIsAuthenticated(User authenticatedUser) {
+        // Check if the authenticated user is present in the security context
         if (authenticatedUser == null) {
             log.info("Authentication context missing");
             return new ResponseEntity<>(
@@ -44,7 +45,8 @@ public class UserController {
             );
         
         }
-        log.info("\nRole of authenticated user '{}': '{}' (expected:'{}'\n", authenticatedUser.getLogin(), authenticatedUser.getRole(), UserRoleEnum.ADMIN);
+        log.info("\nRole of authenticated user '{}': '{}'", authenticatedUser.getLogin(), authenticatedUser.getRole());
+        // Only ADMIN users can perform user management operations
         if (authenticatedUser.getRole() != UserRoleEnum.ADMIN) {
             log.info("User '{}' does not have admin privileges", authenticatedUser.getLogin());
             return new ResponseEntity<>(
