@@ -15,6 +15,7 @@ public interface UserDtoMapper {
     @Mapping(target = "created_at", ignore = true)
     @Mapping(target = "updated_at", ignore = true)
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "role", ignore = true)
     User toEntity(RegisterDTO registerDTO);
 
     // Mapping for 'AddUserRequestDTO', similar to 'RegisterDTO'
@@ -22,6 +23,7 @@ public interface UserDtoMapper {
     @Mapping(target = "created_at", ignore = true)
     @Mapping(target = "updated_at", ignore = true)
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "role", ignore = true)
     User toEntity(AddUserRequestDTO addUserRequestDTO);
 
     // Mapping for 'AddUserRequestDTO', similar to 'RegisterDTO'
@@ -29,5 +31,6 @@ public interface UserDtoMapper {
     @Mapping(target = "created_at", ignore = true)
     @Mapping(target = "updated_at", ignore = true)
     @Mapping(target = "authorities", ignore = true)
+    @Mapping(target = "role", ignore = true)
     User toEntity(UpdateRequestDTO updateRequestDTO);
 }

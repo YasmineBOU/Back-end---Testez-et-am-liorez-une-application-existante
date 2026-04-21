@@ -6,6 +6,7 @@ import com.openclassrooms.etudiant.dto.LoginRequestDTO;
 import com.openclassrooms.etudiant.dto.RegisterDTO;
 import com.openclassrooms.etudiant.dto.UserSummaryDTO;
 import com.openclassrooms.etudiant.entities.User;
+import com.openclassrooms.etudiant.entities.UserRoleEnum;
 import com.openclassrooms.etudiant.mapper.UserDtoMapper;
 import com.openclassrooms.etudiant.service.UserService;
 import jakarta.validation.Valid;
@@ -19,7 +20,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,6 +34,27 @@ public class UserController {
     
     private final UserService userService;
     private final UserDtoMapper userDtoMapper;
+
+    private ResponseEntity<?> userIsAuthenticated(User authenticatedUser) {
+        if (authenticatedUser == null) {
+            log.info("Authentication context missing");
+            return new ResponseEntity<>(
+                Map.of("error", "Authentication required"),
+                HttpStatus.UNAUTHORIZED
+            );
+        
+        }
+        log.info("\nRole of authenticated user '{}': '{}' (expected:'{}'\n", authenticatedUser.getLogin(), authenticatedUser.getRole(), UserRoleEnum.ADMIN);
+        if (authenticatedUser.getRole() != UserRoleEnum.ADMIN) {
+            log.info("User '{}' does not have admin privileges", authenticatedUser.getLogin());
+            return new ResponseEntity<>(
+                Map.of("error", "Admin privileges required"),
+                HttpStatus.FORBIDDEN
+            );
+            
+        }
+        return null; // indicates authentication is valid
+    }
 
     @PostMapping("/api/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterDTO registerDTO) {
@@ -53,15 +74,11 @@ public class UserController {
             @Valid @RequestBody AddUserRequestDTO addUserRequestDTO,
             @AuthenticationPrincipal User authenticatedUser
     ) {
-        
+        ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
         try {
             // Validate authenticated user exists
-            if (authenticatedUser == null) {
-                log.info("Authentication context missing");
-                return new ResponseEntity<>(
-                    Map.of("error", "Authentication required"),
-                    HttpStatus.UNAUTHORIZED
-                );
+            if (authResponse != null) {
+                return authResponse;
             }
             log.info("Authenticated user: {}", authenticatedUser.getLogin());
             
@@ -106,12 +123,9 @@ public class UserController {
           
         try {
             // Validate authenticated user exists
-            if (authenticatedUser == null) {
-                log.info("Authentication context missing");
-                return new ResponseEntity<>(
-                    Map.of("error", "Authentication required"),
-                    HttpStatus.UNAUTHORIZED
-                );
+            ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+            if (authResponse != null) {
+                return authResponse;
             }
             log.info("Authenticated user: {}", authenticatedUser.getLogin());
             Iterable<UserSummaryDTO> users = userService.getUsers(authenticatedUser);
@@ -135,13 +149,11 @@ public class UserController {
           
         try {
             // Validate authenticated user exists
-            if (authenticatedUser == null) {
-                log.info("Authentication context missing");
-                return new ResponseEntity<>(
-                    Map.of("error", "Authentication required"),
-                    HttpStatus.UNAUTHORIZED
-                );
+            ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+            if (authResponse != null) {
+                return authResponse;
             }
+
             log.info("Searching for user with id: {}", id);
             UserSummaryDTO user = userService.getUserById(authenticatedUser, id);
             return new ResponseEntity<>(user, HttpStatus.OK);
@@ -164,13 +176,11 @@ public class UserController {
           
         try {
             // Validate authenticated user exists
-            if (authenticatedUser == null) {
-                log.info("Authentication context missing");
-                return new ResponseEntity<>(
-                    Map.of("error", "Authentication required"),
-                    HttpStatus.UNAUTHORIZED
-                );
+            ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+            if (authResponse != null) {
+                return authResponse;
             }
+
             log.info("Searching for user with id: {}", id);
             userService.deleteUserById(authenticatedUser, id);
             return new ResponseEntity<>(Map.of("message", "User with id " + id + " deleted successfully !"), HttpStatus.OK);
@@ -195,12 +205,9 @@ public class UserController {
           
         try {
             // Validate authenticated user exists
-            if (authenticatedUser == null) {
-                log.info("Authentication context missing");
-                return new ResponseEntity<>(
-                    Map.of("error", "Authentication required"),
-                    HttpStatus.UNAUTHORIZED
-                );
+            ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+            if (authResponse != null) {
+                return authResponse;
             }
             log.info("Updating user with id: {}", id);
             userService.updateUser(authenticatedUser, id, updateRequestDTO);
