@@ -1,6 +1,7 @@
 package com.openclassrooms.etudiant.service;
 
 import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
+import com.openclassrooms.etudiant.dto.UserBasicInfoDTO;
 import com.openclassrooms.etudiant.dto.UserSummaryDTO;
 import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.repository.UserRepository;
@@ -102,10 +103,10 @@ public class UserService {
         return savedUser;
     }
 
-    public Iterable<UserSummaryDTO> getUsers(User authenticatedUser) {
+    public Iterable<UserBasicInfoDTO> getUsers(User authenticatedUser) {
         Assert.notNull(authenticatedUser, "Authenticated user must not be null");
         log.info("User '{}' is retrieving all users", authenticatedUser.getLogin());
-        Iterable<UserSummaryDTO> users = userRepository.findAllUserSummaries();
+        Iterable<UserBasicInfoDTO> users = userRepository.findAllUserBasicInfo();
         log.info("User '{}' retrieved all users: {} users", authenticatedUser.getLogin(), users.spliterator().getExactSizeIfKnown());
         return users;
     }
@@ -169,6 +170,11 @@ public class UserService {
             }
             if (updateRequestDTO.getPassword() != null && !updateRequestDTO.getPassword().trim().isEmpty()) {
                 existingUser.setPassword(passwordEncoder.encode(updateRequestDTO.getPassword().trim()));
+                hasNewData = true;
+            }
+
+            if (updateRequestDTO.getRole() != null) {
+                existingUser.setRole(updateRequestDTO.getRole());
                 hasNewData = true;
             }
 

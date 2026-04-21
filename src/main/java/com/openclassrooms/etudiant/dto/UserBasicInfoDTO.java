@@ -1,22 +1,17 @@
 package com.openclassrooms.etudiant.dto;
 
+import com.openclassrooms.etudiant.entities.UserRoleEnum;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
-
-import com.openclassrooms.etudiant.entities.UserRoleEnum;
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserSummaryDTO {
-    private Long id;
+public class UserBasicInfoDTO {
+    private long id;
     private String firstName;
     private String lastName;
-    private String login;
     private UserRoleEnum role;
-    private LocalDateTime created_at;
-    private LocalDateTime updated_at;
 }

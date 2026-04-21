@@ -2,6 +2,7 @@ package com.openclassrooms.etudiant.controller;
 
 import com.openclassrooms.etudiant.dto.AddUserRequestDTO;
 import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
+import com.openclassrooms.etudiant.dto.UserBasicInfoDTO;
 import com.openclassrooms.etudiant.dto.LoginRequestDTO;
 import com.openclassrooms.etudiant.dto.RegisterDTO;
 import com.openclassrooms.etudiant.dto.UserSummaryDTO;
@@ -34,6 +35,7 @@ public class UserController {
     
     private final UserService userService;
     private final UserDtoMapper userDtoMapper;
+
 
     private ResponseEntity<?> userIsAuthenticated(User authenticatedUser) {
         // Check if the authenticated user is present in the security context
@@ -130,7 +132,7 @@ public class UserController {
                 return authResponse;
             }
             log.info("Authenticated user: {}", authenticatedUser.getLogin());
-            Iterable<UserSummaryDTO> users = userService.getUsers(authenticatedUser);
+            Iterable<UserBasicInfoDTO> users = userService.getUsers(authenticatedUser);
             return new ResponseEntity<>(users, HttpStatus.OK);
         } catch (IllegalStateException e) {
             // Handles: missing authentication context
