@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -29,8 +32,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected void doFilterInternal(@org.springframework.lang.NonNull HttpServletRequest request,
-                                    @org.springframework.lang.NonNull HttpServletResponse response,
-                                    @org.springframework.lang.NonNull FilterChain filterChain) throws ServletException, IOException {
+            @org.springframework.lang.NonNull HttpServletResponse response,
+            @org.springframework.lang.NonNull FilterChain filterChain) throws ServletException, IOException {
 
         log.info("JwtAuthenticationFilter executing for: {} {}", request.getMethod(), request.getRequestURI());
 
@@ -55,7 +58,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         }
 
-        // If username extracted and authentication is absent or anonymous, authenticate user
+        // If username extracted and authentication is absent or anonymous, authenticate
+        // user
         final String username = usernameTemp;
         var currentAuth = SecurityContextHolder.getContext().getAuthentication();
         if (username != null && (currentAuth == null || currentAuth instanceof AnonymousAuthenticationToken)) {
@@ -64,12 +68,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             User user = userRepository.findByLogin(username)
                     .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
-            UsernamePasswordAuthenticationToken authenticationToken =
-                new UsernamePasswordAuthenticationToken(
+            List<SimpleGrantedAuthority> authorities = Collections.singletonList(
+                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name()) // Exemple : "ROLE_ADMIN" ou "ROLE_USER"
+            );
+            UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                     user,
                     null,
-                    user.getAuthorities()
-            );
+                    authorities);
 
             authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 

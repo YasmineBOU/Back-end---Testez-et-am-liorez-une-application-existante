@@ -20,6 +20,7 @@ import org.testcontainers.containers.MySQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -67,11 +68,12 @@ public class UserControllerTest {
 
         // WHEN
         mockMvc.perform(MockMvcRequestBuilders.post(URL)
-                        .content(objectMapper.writeValueAsString(registerDTO))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andDo(print())
-                .andExpect(MockMvcResultMatchers.status().isBadRequest());
+            .content(objectMapper.writeValueAsString(registerDTO))
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(MockMvcResultMatchers.status().isBadRequest()
+        );
     }
 
     @Test
@@ -92,11 +94,12 @@ public class UserControllerTest {
 
         // WHEN
         mockMvc.perform(MockMvcRequestBuilders.post(URL)
-                        .content(objectMapper.writeValueAsString(registerDTO))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andDo(print())
-                .andExpect(MockMvcResultMatchers.status().isBadRequest());
+            .content(objectMapper.writeValueAsString(registerDTO))
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(MockMvcResultMatchers.status().isBadRequest()
+        );
     }
 
     @Test
@@ -110,10 +113,11 @@ public class UserControllerTest {
 
         // WHEN
         mockMvc.perform(MockMvcRequestBuilders.post(URL)
-                        .content(objectMapper.writeValueAsString(registerDTO))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .accept(MediaType.APPLICATION_JSON))
-                .andDo(print())
-                .andExpect(MockMvcResultMatchers.status().isCreated());
+            .content(objectMapper.writeValueAsString(registerDTO))
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON))
+            .andDo(print())
+            .andExpect(MockMvcResultMatchers.status().isCreated()
+        );
     }
 }

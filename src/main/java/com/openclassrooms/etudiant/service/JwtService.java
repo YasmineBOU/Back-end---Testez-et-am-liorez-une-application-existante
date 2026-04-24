@@ -1,20 +1,4 @@
-// package com.openclassrooms.etudiant.service;
-
-
-// import org.springframework.security.core.userdetails.UserDetails;
-// import org.springframework.stereotype.Service;
-
-// @Service
-// public class JwtService {
-
-//     public String generateToken(UserDetails userDetails) {
-//         return null; // TODO
-//     }
-
-// }
-
 package com.openclassrooms.etudiant.service;
-
 
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
@@ -28,8 +12,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
-
-
 @Service
 public class JwtService {
 
@@ -37,13 +19,11 @@ public class JwtService {
     private final long jwtExpirationMs;
 
     public JwtService(
-        @Value("${com.openclassrooms.etudiant.jwt.secret-key}") String key,
-        @Value("${com.openclassrooms.etudiant.jwt.expiration-ms}") long jwtExpirationMs
-    ) {
+            @Value("${com.openclassrooms.etudiant.jwt.secret-key}") String key,
+            @Value("${com.openclassrooms.etudiant.jwt.expiration-ms}") long jwtExpirationMs) {
         this.jwtExpirationMs = jwtExpirationMs;
         this.encodedKey = Keys.hmacShaKeyFor(Base64.getDecoder().decode(key));
     }
-
 
     /**
      * Generate a JWT token containing the user's username and roles.
@@ -52,24 +32,25 @@ public class JwtService {
      * @return a JWT token containing the username and roles
      */
     public String generateToken(UserDetails userDetails) {
+        System.out.println("Generating JWT token for user: " + userDetails.getUsername());
+        System.out.println("Authorities: " + userDetails.getAuthorities());
         return Jwts.builder()
-            .setSubject(userDetails.getUsername())
-            .claim("roles", userDetails.getAuthorities())
-            .setIssuedAt(new Date())
-            .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-            .signWith(encodedKey)
-            .compact();
+                .setSubject(userDetails.getUsername())
+                .claim("roles", userDetails.getAuthorities())
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+                .signWith(encodedKey)
+                .compact();
     }
-    
 
     // Validate token and return username if valid, else throw exception
     public String validateTokenAndGetUsername(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
-                .setSigningKey(encodedKey)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+                    .setSigningKey(encodedKey)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
 
             return claims.getSubject();
 
@@ -78,5 +59,5 @@ public class JwtService {
             throw new RuntimeException("Invalid JWT token", e);
         }
     }
-        
+
 }

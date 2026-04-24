@@ -14,7 +14,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.Assert;
 
-
 @Slf4j
 @Service
 @Transactional
@@ -26,6 +25,7 @@ public class UserService {
 
     /**
      * Registers a new user to the database.
+     * 
      * @param user the user to be registered
      * @throws IllegalArgumentException if a user with the same login already exists
      */
@@ -44,9 +44,10 @@ public class UserService {
     /**
      * Login with given credentials and return a JWT token.
      *
-     * @param login the user's login
+     * @param login    the user's login
      * @param password the user's password
-     * @return a JWT token if the credentials are valid, otherwise an IllegalArgumentException is thrown
+     * @return a JWT token if the credentials are valid, otherwise an
+     *         IllegalArgumentException is thrown
      */
     public String login(String login, String password) {
         log.info("\n\n\nLogin attempt for user: |{}| with \n\n\n", login);
@@ -57,10 +58,10 @@ public class UserService {
         if (user.isPresent() && passwordEncoder.matches(password, user.get().getPassword())) {
             log.info("User '{}' found and password matches\n\n", login);
             UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
-                .username(user.get().getLogin())
-                .password(user.get().getPassword())  // mot de passe encodé
-                .roles("USER")                 // rôle par défaut
-                .build();
+                    .username(user.get().getLogin())
+                    .password(user.get().getPassword())
+                    .roles(user.get().getRole().name())
+                    .build();
             return jwtService.generateToken(userDetails);
         } else {
             throw new IllegalArgumentException("Invalid credentials");
@@ -70,36 +71,35 @@ public class UserService {
     public User addUser(User newUser, User authenticatedUser) {
         Assert.notNull(newUser, "New user must not be null");
         Assert.notNull(authenticatedUser, "Authenticated user must not be null");
-        
+
         // Security: Log who is creating the user
-        log.info("User '{}' is creating new user with login '{}'", 
-                 authenticatedUser.getLogin(), newUser.getLogin());
-        
+        log.info("User '{}' is creating new user with login '{}'",
+                authenticatedUser.getLogin(), newUser.getLogin());
+
         // Validation: Check if login already exists
         Optional<User> existingUser = userRepository.findByLogin(newUser.getLogin());
         if (existingUser.isPresent()) {
             log.info("Attempt to create duplicate user with login: {}", newUser.getLogin());
             throw new IllegalArgumentException(
-                "User with login '" + newUser.getLogin() + "' already exists"
-            );
+                    "User with login '" + newUser.getLogin() + "' already exists");
         }
-        
+
         // Validation: Ensure password is not empty
         if (newUser.getPassword() == null) {
             log.info("Attempt to create user with empty password");
             throw new IllegalArgumentException("Password must not be null");
         }
-        
+
         // Security: Encode password
         newUser.setPassword(passwordEncoder.encode(newUser.getPassword()));
-        
+
         log.info("Creating user with login: {}", newUser.getLogin());
         // Persistence
         User savedUser = userRepository.save(newUser);
-        
-        log.info("User '{}' successfully created with login '{}'", 
-                 authenticatedUser.getLogin(), savedUser.getLogin());
-        
+
+        log.info("User '{}' successfully created with login '{}'",
+                authenticatedUser.getLogin(), savedUser.getLogin());
+
         return savedUser;
     }
 
@@ -107,7 +107,8 @@ public class UserService {
         Assert.notNull(authenticatedUser, "Authenticated user must not be null");
         log.info("User '{}' is retrieving all users", authenticatedUser.getLogin());
         Iterable<UserBasicInfoDTO> users = userRepository.findAllUserBasicInfo();
-        log.info("User '{}' retrieved all users: {} users", authenticatedUser.getLogin(), users.spliterator().getExactSizeIfKnown());
+        log.info("User '{}' retrieved all users: {} users", authenticatedUser.getLogin(),
+                users.spliterator().getExactSizeIfKnown());
         return users;
     }
 
@@ -138,7 +139,7 @@ public class UserService {
             log.info("Attempt to delete non-existent user with id: {}", id);
             throw new IllegalStateException("User with id " + id + " not found in database");
         }
-    }  
+    }
 
     public void updateUser(User authenticatedUser, Long id, UpdateRequestDTO updateRequestDTO) {
         Assert.notNull(authenticatedUser, "Authenticated user must not be null");
@@ -149,12 +150,12 @@ public class UserService {
         try {
             // Security: Log the update attempt
             log.info("User '{}' is attempting to update user with id '{}'", authenticatedUser.getLogin(), id);
-            
+
             final User existingUser = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("User with id " + id + " not found in database"));
-            
+                    .orElseThrow(() -> new IllegalStateException("User with id " + id + " not found in database"));
+
             boolean hasNewData = false;
-            
+
             // Update only non-null fields from the DTO
             if (updateRequestDTO.getFirstName() != null && !updateRequestDTO.getFirstName().trim().isEmpty()) {
                 existingUser.setFirstName(updateRequestDTO.getFirstName().trim());
@@ -182,13 +183,13 @@ public class UserService {
             if (hasNewData) {
                 userRepository.save(existingUser);
                 log.info("User with id '{}' successfully updated by '{}'", id, authenticatedUser.getLogin());
-            } else {    
+            } else {
                 log.info("No new data provided for update of user with id '{}'", id);
             }
         } catch (Exception e) {
             log.error("Error during update attempt by user '{}': {}", authenticatedUser.getLogin(), e.getMessage());
             throw e; // Re-throw after logging
         }
-       
-    }    
+
+    }
 }
