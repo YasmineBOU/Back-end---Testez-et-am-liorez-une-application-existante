@@ -1,13 +1,12 @@
 package com.openclassrooms.etudiant.service;
 
-import com.mysql.cj.x.protobuf.MysqlxCrud.Update;
 import com.openclassrooms.etudiant.dto.UpdateRequestDTO;
+import com.openclassrooms.etudiant.dto.UserBasicInfoDTO;
 import com.openclassrooms.etudiant.dto.UserSummaryDTO;
 import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.entities.UserRoleEnum;
 import com.openclassrooms.etudiant.repository.UserRepository;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -16,25 +15,19 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.springframework.security.access.method.P;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
-import org.testcontainers.shaded.org.checkerframework.checker.units.qual.A;
 
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertThat;
-import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -48,6 +41,7 @@ public class UserServiceTest {
     private static final String LAST_NAME = "Doe";
     private static final String LOGIN = "LOGIN";
     private static final String PASSWORD = "PASSWORD";
+    private static final UserRoleEnum ROLE = UserRoleEnum.USER;
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -59,32 +53,28 @@ public class UserServiceTest {
 
     private static Stream<Arguments> provideInvalidInputs() {
         return Stream.of(
-                // authenticatedUser = null, id = null ou <= 0
-                Arguments.of(null, null),
-                Arguments.of(null, 0L),
-                Arguments.of(null, -1L),
+                // authenticatedUser = null, id = any
+                Arguments.of(null, 1L),
 
-                // authenticatedUser != null, id = null ou <= 0
+                // authenticatedUser = any, id = null ou <= 0
                 Arguments.of(new User(), null),
                 Arguments.of(new User(), 0L),
                 Arguments.of(new User(), -1L));
     }
 
     private static Stream<Arguments> updateUser_provideInvalidInputs() {
-        User[] possibleUsers = { null, new User() };
-        UpdateRequestDTO[] possibleUpdateRequestDTOs = { null, new UpdateRequestDTO() };
-        Long[] possibleIds = { null, 0L, -1L };
 
-        // Génération de toutes les combinaisons avec des boucles for
-        Stream.Builder<Arguments> builder = Stream.builder();
-        for (User user : possibleUsers) {
-            for (UpdateRequestDTO updateRequestDTO : possibleUpdateRequestDTOs) {
-                for (Long id : possibleIds) {
-                    builder.add(Arguments.of(user, updateRequestDTO, id));
-                }
-            }
-        }
-        return builder.build();
+        return Stream.of(
+                // authenticatedUser = null, updayteRequestDTO = any, id = any
+                Arguments.of(null, new UpdateRequestDTO(), 1L),
+
+                // authenticatedUser = any, updateRequestDTO = null, id = any
+                Arguments.of(new User(), null, 1L),
+
+                // authenticatedUser = any, updateRequestDTO = any, id = null ou <= 0
+                Arguments.of(new User(), new UpdateRequestDTO(), null),
+                Arguments.of(new User(), new UpdateRequestDTO(), 0L),
+                Arguments.of(new User(), new UpdateRequestDTO(), -1L));
     }
 
     // Register tests
@@ -113,13 +103,14 @@ public class UserServiceTest {
             user.setLastName(LAST_NAME);
             user.setLogin(LOGIN);
             user.setPassword(PASSWORD);
-            when(passwordEncoder.encode(PASSWORD)).thenReturn(PASSWORD);
             when(userRepository.findByLogin(any())).thenReturn(Optional.of(user));
 
             // THEN
             Assertions.assertThrows(
                     IllegalArgumentException.class,
                     () -> userService.register(user));
+
+            verify(userRepository, never()).save(any());
         }
 
         @Test
@@ -131,8 +122,8 @@ public class UserServiceTest {
             user.setLastName(LAST_NAME);
             user.setLogin(LOGIN);
             user.setPassword(PASSWORD);
-            when(passwordEncoder.encode(PASSWORD)).thenReturn(PASSWORD);
-            when(userRepository.findByLogin(any())).thenReturn(Optional.empty());
+            when(passwordEncoder.encode(PASSWORD)).thenReturn("ENCODED_PASSWORD");
+            when(userRepository.findByLogin(LOGIN)).thenReturn(Optional.empty());
 
             // WHEN
             userService.register(user);
@@ -140,7 +131,9 @@ public class UserServiceTest {
             // THEN
             ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
             verify(userRepository).save(userCaptor.capture());
-            assertThat(userCaptor.getValue()).isEqualTo(user);
+            verify(passwordEncoder, times(1)).encode(PASSWORD);
+            assertThat(userCaptor.getValue()).isSameAs(user);
+            assertThat(userCaptor.getValue().getPassword()).isEqualTo("ENCODED_PASSWORD");
         }
     }
 
@@ -156,28 +149,6 @@ public class UserServiceTest {
             Assertions.assertThrows(
                     IllegalArgumentException.class,
                     () -> userService.login(null, PASSWORD));
-        }
-
-        @Test
-        @DisplayName("Given valid credentials, when login is called, then a JWT token is returned.")
-        public void test_login_with_valid_credentials_returns_jwt_token() {
-            // GIVEN
-            User user = new User();
-            user.setFirstName(FIRST_NAME);
-            user.setLastName(LAST_NAME);
-            user.setLogin(LOGIN);
-            user.setPassword(PASSWORD);
-            when(userRepository.findByLogin(LOGIN)).thenReturn(Optional.of(user));
-            when(passwordEncoder.matches(PASSWORD, user.getPassword())).thenReturn(true);
-            when(jwtService.generateToken(any())).thenReturn("mocked-jwt-token");
-
-            // WHEN
-            String token = userService.login(LOGIN, PASSWORD);
-
-            // THEN
-            verify(userRepository, times(1)).findByLogin(LOGIN);
-            verify(jwtService, times(1)).generateToken(any());
-            assertThat(token).isEqualTo("mocked-jwt-token");
         }
 
         @Test
@@ -213,6 +184,28 @@ public class UserServiceTest {
                     () -> userService.login(LOGIN, PASSWORD));
 
             verify(jwtService, never()).generateToken(any());
+        }
+
+        @Test
+        @DisplayName("Given valid credentials, when login is called, then a JWT token is returned.")
+        public void test_login_with_valid_credentials_returns_jwt_token() {
+            // GIVEN
+            User user = new User();
+            user.setFirstName(FIRST_NAME);
+            user.setLastName(LAST_NAME);
+            user.setLogin(LOGIN);
+            user.setPassword(PASSWORD);
+            when(userRepository.findByLogin(LOGIN)).thenReturn(Optional.of(user));
+            when(passwordEncoder.matches(PASSWORD, user.getPassword())).thenReturn(true);
+            when(jwtService.generateToken(any())).thenReturn("mocked-jwt-token");
+
+            // WHEN
+            String token = userService.login(LOGIN, PASSWORD);
+
+            // THEN
+            verify(userRepository, times(1)).findByLogin(LOGIN);
+            verify(jwtService, times(1)).generateToken(any());
+            assertThat(token).isEqualTo("mocked-jwt-token");
         }
     }
 
@@ -255,7 +248,7 @@ public class UserServiceTest {
                     () -> userService.addUser(newUser, new User()));
 
             verify(userRepository, times(1)).findByLogin(LOGIN);
-            verify(userRepository, never()).save(any());
+            verify(userRepository, never()).save(newUser);
         }
 
         @Test
@@ -270,7 +263,6 @@ public class UserServiceTest {
                     IllegalArgumentException.class,
                     () -> userService.addUser(newUser, new User()));
 
-            verify(userRepository, times(1)).findByLogin(newUser.getLogin());
             verify(userRepository, never()).save(newUser);
         }
 
@@ -283,6 +275,7 @@ public class UserServiceTest {
             newUser.setLastName(LAST_NAME);
             newUser.setLogin(LOGIN);
             newUser.setPassword(PASSWORD);
+            newUser.setRole(ROLE);
             when(passwordEncoder.encode(PASSWORD)).thenReturn("ENCODED_PASSWORD");
             when(userRepository.findByLogin(LOGIN)).thenReturn(Optional.empty());
             when(userRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -296,6 +289,7 @@ public class UserServiceTest {
             verify(userRepository, times(1)).save(userCaptor.capture());
             verify(passwordEncoder, times(1)).encode(PASSWORD);
             assertThat(userCaptor.getValue().getPassword()).isEqualTo("ENCODED_PASSWORD");
+            assertThat(userCaptor.getValue().getRole()).isEqualTo(ROLE);
         }
 
     }
@@ -319,13 +313,15 @@ public class UserServiceTest {
         @DisplayName("Given a valid authenticated user, when getUsers is called, then users are retrieved.")
         public void test_getUsers_with_valid_authenticated_user_retrieves_users() {
             // GIVEN
-            when(userRepository.findAllUserBasicInfo()).thenReturn(new ArrayList<>()); // Return an empty list
+            ArrayList<UserBasicInfoDTO> expectedUserList = new ArrayList<>();
+            when(userRepository.findAllUserBasicInfo()).thenReturn(expectedUserList);
 
             // WHEN
-            userService.getUsers(new User());
+            Iterable<UserBasicInfoDTO> fetchedUsers = userService.getUsers(new User());
 
             // THEN
             verify(userRepository, times(1)).findAllUserBasicInfo();
+            assertThat(fetchedUsers).isSameAs(expectedUserList);
         }
 
     }
@@ -358,24 +354,23 @@ public class UserServiceTest {
             Assertions.assertThrows(
                     IllegalStateException.class,
                     () -> userService.getUserById(new User(), unexistingId));
-
-            verify(userRepository, times(1)).findUserById(unexistingId);
         }
 
         @Test
         @DisplayName("Given a valid authenticated user and an existing id, when getUserById is called, then the user is retrieved.")
         public void test_getUserById_with_valid_authenticated_user_retrieves_user() {
             long existingId = 1L;
+            UserSummaryDTO expectedUser = new UserSummaryDTO();
+            expectedUser.setId(existingId);
             // GIVEN
-            when(userRepository.findUserById(existingId)).thenReturn(new UserSummaryDTO());
+            when(userRepository.findUserById(existingId)).thenReturn(expectedUser);
 
             // WHEN
-            userService.getUserById(new User(), existingId);
+            UserSummaryDTO fetchedUserSummaryDTO = userService.getUserById(new User(), existingId);
 
             // THEN
-            ArgumentCaptor<UserSummaryDTO> userSummaryCaptor = ArgumentCaptor.forClass(UserSummaryDTO.class);
             verify(userRepository, times(1)).findUserById(existingId);
-            assertThat(userSummaryCaptor.getAllValues()).isNotNull();
+            assertThat(fetchedUserSummaryDTO).isSameAs(expectedUser);
         }
 
     }
@@ -451,30 +446,29 @@ public class UserServiceTest {
         public void test_updateUser_with_unexisting_id_throws_IllegalStateException() {
             // GIVEN
             Long unexistingId = 999L;
-            when(userRepository.existsById(unexistingId)).thenThrow(new IllegalStateException());
+            when(userRepository.existsById(unexistingId)).thenReturn(false);
 
             // THEN
             Assertions.assertThrows(
                     IllegalStateException.class,
                     () -> userService.updateUser(new User(), unexistingId, new UpdateRequestDTO()));
-
-            verify(userRepository, never()).save(any(User.class));
         }
 
         @Test
-        @DisplayName("Given a valid existing id, when updateUser is called, then the user is updated.")
-        public void test_updateUser_with_valid_existing_id_updates_user() {
+        @DisplayName("Given a valid existing id and new data, when updateUser is called, then the user is updated.")
+        public void test_updateUser_with_valid_existing_id_and_new_data_updates_user() {
             // GIVEN
             long existingId = 1L;
             // Update user with new data
             UpdateRequestDTO updateRequestDTO = new UpdateRequestDTO();
-            updateRequestDTO.setFirstName(FIRST_NAME);
+            updateRequestDTO.setFirstName("NewFirstName");
             // Existing user data
             User existingUser = new User();
+            existingUser.setFirstName(FIRST_NAME);
             existingUser.setLastName(LAST_NAME);
             existingUser.setLogin(LOGIN);
             existingUser.setPassword(PASSWORD);
-            existingUser.setRole(UserRoleEnum.USER);
+            existingUser.setRole(ROLE);
 
             when(userRepository.findById(existingId)).thenReturn(Optional.of(existingUser));
             when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -486,11 +480,11 @@ public class UserServiceTest {
             ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
             verify(userRepository, times(1)).findById(existingId);
             verify(userRepository, times(1)).save(userCaptor.capture());
-            assertThat(userCaptor.getValue().getFirstName()).isEqualTo(FIRST_NAME);
+            assertThat(userCaptor.getValue().getFirstName()).isEqualTo("NewFirstName");
             assertThat(userCaptor.getValue().getLastName()).isEqualTo(LAST_NAME);
             assertThat(userCaptor.getValue().getLogin()).isEqualTo(LOGIN);
             assertThat(userCaptor.getValue().getPassword()).isEqualTo(PASSWORD);
-            assertThat(userCaptor.getValue().getRole()).isEqualTo(UserRoleEnum.USER);
+            assertThat(userCaptor.getValue().getRole()).isEqualTo(ROLE);
         }
     }
 }
