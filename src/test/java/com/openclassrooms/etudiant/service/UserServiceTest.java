@@ -65,16 +65,16 @@ public class UserServiceTest {
     private static Stream<Arguments> updateUser_provideInvalidInputs() {
 
         return Stream.of(
-                // authenticatedUser = null, updayteRequestDTO = any, id = any
-                Arguments.of(null, new UpdateRequestDTO(), 1L),
+                // authenticatedUser = null, userToUpdate = any, id = any
+                Arguments.of(null, new User(), 1L),
 
-                // authenticatedUser = any, updateRequestDTO = null, id = any
+                // authenticatedUser = any, userToUpdate = null, id = any
                 Arguments.of(new User(), null, 1L),
 
-                // authenticatedUser = any, updateRequestDTO = any, id = null ou <= 0
-                Arguments.of(new User(), new UpdateRequestDTO(), null),
-                Arguments.of(new User(), new UpdateRequestDTO(), 0L),
-                Arguments.of(new User(), new UpdateRequestDTO(), -1L));
+                // authenticatedUser = any, userToUpdate = any, id = null ou <= 0
+                Arguments.of(new User(), new User(), null),
+                Arguments.of(new User(), new User(), 0L),
+                Arguments.of(new User(), new User(), -1L));
     }
 
     // Register tests
@@ -433,12 +433,12 @@ public class UserServiceTest {
         @MethodSource("com.openclassrooms.etudiant.service.UserServiceTest#updateUser_provideInvalidInputs")
         @DisplayName("Given an invalid authenticated user and/or updateRequestDTO and/or id, when updateUser is called, then IllegalArgumentException is thrown.")
         public void test_updateUser_with_invalid_inputs_throws_IllegalArgumentException(User authenticatedUser,
-                UpdateRequestDTO updateRequestDTO,
+                User userToUpdate,
                 Long id) {
             // THEN
             Assertions.assertThrows(
                     IllegalArgumentException.class,
-                    () -> userService.updateUser(authenticatedUser, id, updateRequestDTO));
+                    () -> userService.updateUser(authenticatedUser, id, userToUpdate));
         }
 
         @Test
@@ -451,7 +451,7 @@ public class UserServiceTest {
             // THEN
             Assertions.assertThrows(
                     IllegalStateException.class,
-                    () -> userService.updateUser(new User(), unexistingId, new UpdateRequestDTO()));
+                    () -> userService.updateUser(new User(), unexistingId, new User()));
         }
 
         @Test
@@ -460,8 +460,8 @@ public class UserServiceTest {
             // GIVEN
             long existingId = 1L;
             // Update user with new data
-            UpdateRequestDTO updateRequestDTO = new UpdateRequestDTO();
-            updateRequestDTO.setFirstName("NewFirstName");
+            User userToUpdate = new User();
+            userToUpdate.setFirstName("NewFirstName");
             // Existing user data
             User existingUser = new User();
             existingUser.setFirstName(FIRST_NAME);
@@ -474,7 +474,7 @@ public class UserServiceTest {
             when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             // WHEN
-            userService.updateUser(new User(), existingId, updateRequestDTO);
+            userService.updateUser(new User(), existingId, userToUpdate);
 
             // THEN
             ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);

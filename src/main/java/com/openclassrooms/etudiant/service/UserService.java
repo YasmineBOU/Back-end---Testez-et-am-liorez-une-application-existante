@@ -9,6 +9,8 @@ import jakarta.transaction.Transactional;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -50,7 +52,7 @@ public class UserService {
      *         IllegalArgumentException is thrown
      */
     public String login(String login, String password) {
-        log.info("\n\n\nLogin attempt for user: |{}| with \n\n\n", login);
+        log.info("\n\n\nLogin attempt for user: |{}| \n\n\n", login);
         Assert.notNull(login, "Login must not be null");
         Assert.notNull(password, "Password must not be null");
         log.info("Attempting login for user: {}", login);
@@ -64,7 +66,7 @@ public class UserService {
                     .build();
             return jwtService.generateToken(userDetails);
         } else {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new BadCredentialsException("Invalid credentials");
         }
     }
 
@@ -127,7 +129,7 @@ public class UserService {
         }
     }
 
-    public void deleteUserById(User authenticatedUser, Long id) {
+    public void deleteUser(User authenticatedUser, Long id) {
         Assert.notNull(authenticatedUser, "Authenticated user must not be null");
         Assert.notNull(id, "User ID must not be null");
         Assert.isTrue(id > 0, "User ID must be a positive number");
@@ -141,11 +143,11 @@ public class UserService {
         }
     }
 
-    public void updateUser(User authenticatedUser, Long id, UpdateRequestDTO updateRequestDTO) {
-        Assert.notNull(authenticatedUser, "Authenticated user must not be null");
+    public void updateUser(User authenticatedUser, Long id, User user) {
         Assert.notNull(id, "User ID must not be null");
-        Assert.notNull(updateRequestDTO, "Update data must not be null");
         Assert.isTrue(id > 0, "User ID must be a positive number");
+        Assert.notNull(authenticatedUser, "Authenticated user must not be null");
+        Assert.notNull(user, "User update data must not be null");
 
         try {
             // Security: Log the update attempt
@@ -157,29 +159,28 @@ public class UserService {
             boolean hasNewData = false;
 
             // Update only non-null fields from the DTO
-            if (updateRequestDTO.getFirstName() != null && !updateRequestDTO.getFirstName().trim().isEmpty()) {
-                existingUser.setFirstName(updateRequestDTO.getFirstName().trim());
+            if (user.getFirstName() != null && !user.getFirstName().trim().isEmpty()) {
+                existingUser.setFirstName(user.getFirstName().trim());
                 hasNewData = true;
             }
-            if (updateRequestDTO.getLastName() != null && !updateRequestDTO.getLastName().trim().isEmpty()) {
-                existingUser.setLastName(updateRequestDTO.getLastName().trim());
+            if (user.getLastName() != null && !user.getLastName().trim().isEmpty()) {
+                existingUser.setLastName(user.getLastName().trim());
                 hasNewData = true;
             }
-            if (updateRequestDTO.getLogin() != null && !updateRequestDTO.getLogin().trim().isEmpty()) {
-                existingUser.setLogin(updateRequestDTO.getLogin().trim());
+            if (user.getLogin() != null && !user.getLogin().trim().isEmpty()) {
+                existingUser.setLogin(user.getLogin().trim());
                 hasNewData = true;
             }
-            if (updateRequestDTO.getPassword() != null && !updateRequestDTO.getPassword().trim().isEmpty()) {
-                existingUser.setPassword(passwordEncoder.encode(updateRequestDTO.getPassword().trim()));
-                hasNewData = true;
-            }
-
-            if (updateRequestDTO.getRole() != null) {
-                existingUser.setRole(updateRequestDTO.getRole());
+            if (user.getPassword() != null && !user.getPassword().trim().isEmpty()) {
+                existingUser.setPassword(passwordEncoder.encode(user.getPassword().trim()));
                 hasNewData = true;
             }
 
-            // Preserve existing values for created_at, updated_at, etc.
+            if (user.getRole() != null) {
+                existingUser.setRole(user.getRole());
+                hasNewData = true;
+            }
+
             if (hasNewData) {
                 userRepository.save(existingUser);
                 log.info("User with id '{}' successfully updated by '{}'", id, authenticatedUser.getLogin());
