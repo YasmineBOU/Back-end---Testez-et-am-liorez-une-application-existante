@@ -4,9 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openclassrooms.etudiant.configuration.security.CustomUserDetailService;
 import com.openclassrooms.etudiant.configuration.security.JwtAuthenticationFilter;
+import com.openclassrooms.etudiant.controller.UserControllerTest.AddUserTests.MvcResultAndAuthenticatedUser;
 import com.openclassrooms.etudiant.dto.AddUserRequestDTO;
 import com.openclassrooms.etudiant.dto.LoginRequestDTO;
 import com.openclassrooms.etudiant.dto.RegisterDTO;
+import com.openclassrooms.etudiant.dto.UserBasicInfoDTO;
 import com.openclassrooms.etudiant.entities.User;
 import com.openclassrooms.etudiant.entities.UserRoleEnum;
 import com.openclassrooms.etudiant.handler.RestExceptionHandler;
@@ -14,6 +16,7 @@ import com.openclassrooms.etudiant.mapper.UserDtoMapper;
 import com.openclassrooms.etudiant.service.JwtService;
 import com.openclassrooms.etudiant.service.UserService;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +40,7 @@ import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultMatcher;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
@@ -46,15 +50,19 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.securityContext;
 
 import org.springframework.security.core.context.SecurityContext;
@@ -332,39 +340,106 @@ public class UserControllerTest {
 
     @Nested
     @Tag("addUser")
-    @DisplayName("Tests for add-user method")
+    @DisplayName("Tests for addUser method")
     class AddUserTests {
+
+        private AddUserRequestDTO addUserRequestDTO;
+
+        public record MvcResultAndAuthenticatedUser(User authenticatedUser, Map response) {
+        }
 
         @BeforeEach
         public void setUp() {
+            // Get the URL for addUser endpoint
             URL = URLS_BY_METHOD.get("addUser");
-        }
-
-        @Test
-        @DisplayName("Given an authenticated admin user, when add-user is called, then Created is returned.")
-        public void test_addUser_WhenUserIsAdmin_ShouldReturnCreated() throws Exception {
-            // GIVEN
-            User authenticatedUser = new User();
-            authenticatedUser.setLogin("admin");
-            authenticatedUser.setRole(UserRoleEnum.ADMIN);
-
-            Authentication auth = new UsernamePasswordAuthenticationToken(
-                    authenticatedUser,
-                    null,
-                    List.of(new SimpleGrantedAuthority("ROLE_ADMIN")));
-
-            SecurityContext securityContext = new SecurityContextImpl();
-            securityContext.setAuthentication(auth);
-            TestSecurityContextHolder.setContext(securityContext);
-
             // Set new user details
-            AddUserRequestDTO addUserRequestDTO = new AddUserRequestDTO();
+            addUserRequestDTO = new AddUserRequestDTO();
             addUserRequestDTO.setLogin(LOGIN);
             addUserRequestDTO.setPassword(PASSWORD);
             addUserRequestDTO.setFirstName(FIRST_NAME);
             addUserRequestDTO.setLastName(LAST_NAME);
             addUserRequestDTO.setRole(ROLE);
+        }
 
+        @AfterEach
+        public void tearDown() {
+            TestSecurityContextHolder.clearContext();
+        }
+
+        public MvcResultAndAuthenticatedUser getMvcResultWithAuthenticatedUserSetInContext(String login,
+                UserRoleEnum role,
+                AddUserRequestDTO addUserRequestDTO, ResultMatcher expectedStatus)
+                throws Exception {
+            // GIVEN
+            User authenticatedUser = new User();
+            authenticatedUser.setLogin(login);
+            authenticatedUser.setRole(role);
+            // Create an Authentication object with the authenticated user and their role
+            Authentication auth = new UsernamePasswordAuthenticationToken(
+                    authenticatedUser,
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
+
+            // Set the authentication in the security context
+            SecurityContext securityContext = new SecurityContextImpl();
+            securityContext.setAuthentication(auth);
+            TestSecurityContextHolder.setContext(securityContext);
+
+            // WHEN
+            MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post(URL)
+                    .with(securityContext(securityContext))
+                    .content(objectMapper.writeValueAsString(addUserRequestDTO))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(expectedStatus)
+                    .andExpect(result -> {
+                        String contentType = result.getResponse().getContentType();
+                        if (contentType == null) {
+                            throw new AssertionError("Content-Type est null");
+                        } else if (!(contentType.startsWith("application/json") ||
+                                contentType.startsWith("application/problem+json"))) {
+                            throw new AssertionError(
+                                    "The content type must be 'application/json' or 'application/problem+json', but was: "
+                                            + contentType);
+                        }
+                    })
+                    .andReturn();
+
+            return new MvcResultAndAuthenticatedUser(authenticatedUser, getResponseBodyAsMap(mvcResult));
+        }
+
+        public Map getMvcResultWithUnauthenticatedUser(String login,
+                UserRoleEnum role,
+                AddUserRequestDTO addUserRequestDTO, ResultMatcher expectedStatus)
+                throws Exception {
+            // WHEN
+            MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post(URL)
+                    .content(objectMapper.writeValueAsString(addUserRequestDTO))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(expectedStatus)
+                    .andExpect(result -> {
+                        String contentType = result.getResponse().getContentType();
+                        if (contentType == null) {
+                            throw new AssertionError("Content-Type est null");
+                        } else if (!(contentType.startsWith("application/json") ||
+                                contentType.startsWith("application/problem+json"))) {
+                            throw new AssertionError(
+                                    "The content type must be 'application/json' or 'application/problem+json', but was: "
+                                            + contentType);
+                        }
+                    })
+                    .andReturn();
+
+            return getResponseBodyAsMap(mvcResult);
+        }
+
+        @Test
+        @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called, then Created is returned.")
+        public void test_addUser_WhenUserIsAdmin_ShouldReturnCreated() throws Exception {
+            // GIVEN
             // Mock the mapping from DTO to entity
             User newUser = new User();
             newUser.setId(1L);
@@ -378,24 +453,385 @@ public class UserControllerTest {
             when(userService.addUser(any(User.class), any(User.class))).thenReturn(newUser);
 
             // WHEN
-            MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.post(URL)
+            MvcResultAndAuthenticatedUser result = getMvcResultWithAuthenticatedUserSetInContext(
+                    "admin",
+                    UserRoleEnum.ADMIN,
+                    addUserRequestDTO,
+                    MockMvcResultMatchers.status().isCreated());
+
+            // THEN
+            verify(userDtoMapper, times(1)).toEntity(addUserRequestDTO);
+            verify(userService, times(1)).addUser(newUser, result.authenticatedUser());
+            assertThat(result.response().get("message")).isEqualTo("User created successfully");
+            assertThat(Long.valueOf(result.response().get("userId").toString())).isEqualTo(newUser.getId());
+            assertThat(result.response().get("login")).isEqualTo(addUserRequestDTO.getLogin());
+            assertThat(result.response()).doesNotContainKeys("password", "passwordHash", "passwordSalt");
+            assertThat(result.response()).doesNotContainValue(PASSWORD);
+
+        }
+
+        @Test
+        @DisplayName("Given an authenticated 'USER' lambda user, when addUser is called, then FORBIDDEN is returned.")
+        public void test_addUser_WhenUserIsUser_ShouldReturnForbidden() throws Exception {
+            // GIVEN
+            // WHEN
+            MvcResultAndAuthenticatedUser result = getMvcResultWithAuthenticatedUserSetInContext(
+                    "user",
+                    UserRoleEnum.USER,
+                    addUserRequestDTO,
+                    MockMvcResultMatchers.status().isForbidden());
+
+            // THEN
+            verifyNoInteractions(userDtoMapper);
+            verifyNoInteractions(userService);
+            assertThat(result.response().get("error")).isEqualTo("Admin privileges required");
+        }
+
+        @Test
+        @DisplayName("Given an existing user added by an admin, when addUser is called, then BadRequest is returned.")
+        public void test_addUser_WhenUserExists_ShouldReturnBadRequest() throws Exception {
+            // GIVEN
+            User existingUser = new User();
+            when(userDtoMapper.toEntity(addUserRequestDTO)).thenReturn(existingUser);
+            when(userService.addUser(any(User.class), any(User.class))).thenThrow(
+                    new IllegalArgumentException("User with login '" + LOGIN + "' already exists"));
+
+            // WHEN
+            MvcResultAndAuthenticatedUser result = getMvcResultWithAuthenticatedUserSetInContext(
+                    "admin",
+                    UserRoleEnum.ADMIN,
+                    addUserRequestDTO,
+                    MockMvcResultMatchers.status().isBadRequest());
+
+            // THEN
+            verify(userDtoMapper, times(1)).toEntity(addUserRequestDTO);
+            verify(userService, times(1)).addUser(existingUser, result.authenticatedUser());
+            assertThat(result.response().get("error")).isNotNull();
+
+        }
+
+        @Test
+        @DisplayName("Given an unauthenticated user, when addUser is called, then UNAUTHORIZED is returned.")
+        public void test_addUser_WhenUserIsUnauthenticated_ShouldReturnUnauthorized() throws Exception {
+            // GIVEN
+            // Mock the mapping from DTO to entity
+            User newUser = new User();
+
+            when(userService.addUser(any(User.class), any(User.class))).thenReturn(newUser);
+
+            // WHEN
+            Map response = getMvcResultWithUnauthenticatedUser(
+                    null,
+                    UserRoleEnum.USER,
+                    addUserRequestDTO,
+                    MockMvcResultMatchers.status().isUnauthorized());
+
+            // THEN
+            verifyNoInteractions(userDtoMapper);
+            verifyNoInteractions(userService);
+            assertThat(response.get("error")).isEqualTo("Authentication required");
+        }
+
+        @Nested
+        @Tag("AddUser - Request Validation")
+        @DisplayName("Tests for addUser method - Request Validation")
+        class AddUserRequestValidationTests {
+            @Test
+            @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called with empty request body, then BadRequest is returned.")
+            public void test_addUser_WhenRequestIsEmpty_ShouldReturnBadRequest() throws Exception {
+                // GIVEN
+                // WHEN
+                getMvcResultWithAuthenticatedUserSetInContext(
+                        "admin",
+                        UserRoleEnum.ADMIN,
+                        new AddUserRequestDTO(), // empty request body
+                        MockMvcResultMatchers.status().isBadRequest());
+
+                // THEN
+                verifyNoInteractions(userDtoMapper);
+                verifyNoInteractions(userService);
+            }
+
+            @Test
+            @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called with invalid request firstName, then BadRequest is returned.")
+            public void test_addUser_WhenRequestFirstNameIsInvalid_ShouldReturnBadRequest() throws Exception {
+                // GIVEN
+                addUserRequestDTO.setFirstName(""); // Invalid first name
+
+                // WHEN
+                getMvcResultWithAuthenticatedUserSetInContext(
+                        "admin",
+                        UserRoleEnum.ADMIN,
+                        addUserRequestDTO,
+                        MockMvcResultMatchers.status().isBadRequest());
+
+                // THEN
+                verifyNoInteractions(userDtoMapper);
+                verifyNoInteractions(userService);
+            }
+
+            @Test
+            @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called with invalid request lastName, then BadRequest is returned.")
+            public void test_addUser_WhenRequestLastNameIsInvalid_ShouldReturnBadRequest() throws Exception {
+                // GIVEN
+                addUserRequestDTO.setLastName(""); // Invalid last name
+
+                // WHEN
+                getMvcResultWithAuthenticatedUserSetInContext(
+                        "admin",
+                        UserRoleEnum.ADMIN,
+                        addUserRequestDTO,
+                        MockMvcResultMatchers.status().isBadRequest());
+
+                // THEN
+                verifyNoInteractions(userDtoMapper);
+                verifyNoInteractions(userService);
+            }
+
+            @Test
+            @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called with invalid request login, then BadRequest is returned.")
+            public void test_addUser_WhenRequestLoginIsInvalid_ShouldReturnBadRequest() throws Exception {
+                // GIVEN
+                addUserRequestDTO.setLogin(""); // Invalid login
+
+                // WHEN
+                getMvcResultWithAuthenticatedUserSetInContext(
+                        "admin",
+                        UserRoleEnum.ADMIN,
+                        addUserRequestDTO,
+                        MockMvcResultMatchers.status().isBadRequest());
+
+                // THEN
+                verifyNoInteractions(userDtoMapper);
+                verifyNoInteractions(userService);
+            }
+
+            @Test
+            @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called with invalid request password, then BadRequest is returned.")
+            public void test_addUser_WhenRequestPasswordIsInvalid_ShouldReturnBadRequest() throws Exception {
+                // GIVEN
+                addUserRequestDTO.setPassword(""); // Invalid password
+
+                // WHEN
+                getMvcResultWithAuthenticatedUserSetInContext(
+                        "admin",
+                        UserRoleEnum.ADMIN,
+                        addUserRequestDTO,
+                        MockMvcResultMatchers.status().isBadRequest());
+
+                // THEN
+                verifyNoInteractions(userDtoMapper);
+                verifyNoInteractions(userService);
+            }
+
+            @Test
+            @DisplayName("Given an authenticated 'ADMIN' user, when addUser is called with invalid request role, then BadRequest is returned.")
+            public void test_addUser_WhenRequestRoleIsInvalid_ShouldReturnBadRequest() throws Exception {
+                // GIVEN
+                addUserRequestDTO.setRole(null); // Invalid role
+
+                // WHEN
+                getMvcResultWithAuthenticatedUserSetInContext(
+                        "admin",
+                        UserRoleEnum.ADMIN,
+                        addUserRequestDTO,
+                        MockMvcResultMatchers.status().isBadRequest());
+
+                // THEN
+                verifyNoInteractions(userDtoMapper);
+                verifyNoInteractions(userService);
+            }
+        }
+
+    }
+
+    @Nested
+    @Tag("readUser")
+    @DisplayName("Tests for readUser method")
+    class ReadUserTests {
+
+        private List<UserBasicInfoDTO> users;
+
+        public record MvcResultAndAuthenticatedUser(User authenticatedUser, MvcResult mvcResult) {
+        }
+
+        @BeforeEach
+        public void setUp() {
+            // Get the URL for addUser endpoint
+            URL = URLS_BY_METHOD.get("readUser");
+            users = List.of(
+                    new UserBasicInfoDTO(),
+                    new UserBasicInfoDTO(),
+                    new UserBasicInfoDTO());
+            // User 1
+            users.get(1).setId(1L);
+            users.get(1).setFirstName(FIRST_NAME);
+            users.get(1).setLastName(LAST_NAME);
+            users.get(1).setRole(ROLE);
+            // User 2
+            users.get(0).setId(2L);
+            users.get(0).setFirstName("Jane");
+            users.get(0).setLastName("Smith");
+            users.get(0).setRole(UserRoleEnum.USER);
+            // User 3
+            users.get(2).setId(3L);
+            users.get(2).setFirstName("Admin");
+            users.get(2).setLastName("User");
+            users.get(2).setRole(UserRoleEnum.ADMIN);
+
+        }
+
+        @AfterEach
+        public void tearDown() {
+            TestSecurityContextHolder.clearContext();
+        }
+
+        private List<UserBasicInfoDTO> getResponseBodyAsUserBasicInfoDTO(MvcResult mvcResult) throws Exception {
+            String responseContent = mvcResult.getResponse().getContentAsString();
+            return objectMapper.readValue(
+                    responseContent, new TypeReference<List<UserBasicInfoDTO>>() {
+                    });
+        }
+
+        public MvcResultAndAuthenticatedUser getMvcResultWithAuthenticatedUserSetInContext(String login,
+                UserRoleEnum role,
+                ResultMatcher expectedStatus)
+                throws Exception {
+            // GIVEN
+            User authenticatedUser = new User();
+            authenticatedUser.setLogin(login);
+            authenticatedUser.setRole(role);
+            // Create an Authentication object with the authenticated user and their role
+            Authentication auth = new UsernamePasswordAuthenticationToken(
+                    authenticatedUser,
+                    null,
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role.name())));
+
+            // Set the authentication in the security context
+            SecurityContext securityContext = new SecurityContextImpl();
+            securityContext.setAuthentication(auth);
+            TestSecurityContextHolder.setContext(securityContext);
+
+            // WHEN
+            MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get(URL)
                     .with(securityContext(securityContext))
-                    .content(objectMapper.writeValueAsString(addUserRequestDTO))
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON))
                     .andDo(print())
-                    .andExpect(MockMvcResultMatchers.status().isCreated())
+                    .andExpect(expectedStatus)
+                    .andExpect(result -> {
+                        String contentType = result.getResponse().getContentType();
+                        if (contentType == null) {
+                            throw new AssertionError("Content-Type est null");
+                        } else if (!(contentType.startsWith("application/json") ||
+                                contentType.startsWith("application/problem+json"))) {
+                            throw new AssertionError(
+                                    "The content type must be 'application/json' or 'application/problem+json', but was: "
+                                            + contentType);
+                        }
+                    })
                     .andReturn();
 
-            Map responseBody = getResponseBodyAsMap(mvcResult);
+            return new MvcResultAndAuthenticatedUser(
+                    authenticatedUser,
+                    mvcResult);
+        }
+
+        public Map getMvcResultWithUnauthenticatedUser(String login,
+                UserRoleEnum role,
+                ResultMatcher expectedStatus)
+                throws Exception {
+            // WHEN
+            MvcResult mvcResult = mockMvc.perform(MockMvcRequestBuilders.get(URL)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(expectedStatus)
+                    .andExpect(result -> {
+                        String contentType = result.getResponse().getContentType();
+                        if (contentType == null) {
+                            throw new AssertionError("Content-Type est null");
+                        } else if (!(contentType.startsWith("application/json") ||
+                                contentType.startsWith("application/problem+json"))) {
+                            throw new AssertionError(
+                                    "The content type must be 'application/json' or 'application/problem+json', but was: "
+                                            + contentType);
+                        }
+                    })
+                    .andReturn();
+
+            return getResponseBodyAsMap(mvcResult);
+        }
+
+        @Test
+        @DisplayName("Given an authenticated 'ADMIN' user and users list is not empty, when readUser is called, then OK is returned.")
+        public void test_readUser_WhenUserIsAdminAndUserListIsNotEmpty_ShouldReturnOk() throws Exception {
+            // GIVEN
+            when(userService.getUsers(any(User.class))).thenReturn(users);
+
+            // WHEN
+            MvcResultAndAuthenticatedUser result = getMvcResultWithAuthenticatedUserSetInContext(
+                    "admin",
+                    UserRoleEnum.ADMIN,
+                    MockMvcResultMatchers.status().isOk());
+
+            List<UserBasicInfoDTO> responseUsers = getResponseBodyAsUserBasicInfoDTO(result.mvcResult());
 
             // THEN
-            assertThat(responseBody.get("message")).isEqualTo("User created successfully");
-            assertThat(Long.valueOf(responseBody.get("userId").toString())).isEqualTo(newUser.getId());
-            assertThat(responseBody.get("login")).isEqualTo(addUserRequestDTO.getLogin());
-            // Clean up
-            TestSecurityContextHolder.clearContext();
+            verify(userService, times(1)).getUsers(result.authenticatedUser());
+            assertThat(responseUsers).usingRecursiveComparison().isEqualTo(users);
+        }
 
+        @Test
+        @DisplayName("Given an authenticated 'ADMIN' user and users list is empty, when readUser is called, then OK is returned.")
+        public void test_readUser_WhenUserIsAdminAndUserListIsEmpty_ShouldReturnOk() throws Exception {
+            // GIVEN
+            List<UserBasicInfoDTO> emptyList = List.of();
+            when(userService.getUsers(any(User.class))).thenReturn(emptyList);
+
+            // WHEN
+            MvcResultAndAuthenticatedUser result = getMvcResultWithAuthenticatedUserSetInContext(
+                    "admin",
+                    UserRoleEnum.ADMIN,
+                    MockMvcResultMatchers.status().isOk());
+
+            List<UserBasicInfoDTO> responseUsers = getResponseBodyAsUserBasicInfoDTO(result.mvcResult());
+
+            // THEN
+            verify(userService, times(1)).getUsers(result.authenticatedUser());
+            assertThat(responseUsers).usingRecursiveComparison().isEqualTo(emptyList);
+        }
+
+        @Test
+        @DisplayName("Given an authenticated 'USER' lambda user, when readUser is called, then FORBIDDEN is returned.")
+        public void test_readUser_WhenUserIsUser_ShouldReturnForbidden() throws Exception {
+            // GIVEN
+            // WHEN
+            MvcResultAndAuthenticatedUser result = getMvcResultWithAuthenticatedUserSetInContext(
+                    "user",
+                    UserRoleEnum.USER,
+                    MockMvcResultMatchers.status().isForbidden());
+
+            Map response = getResponseBodyAsMap(result.mvcResult());
+            // THEN
+            verifyNoInteractions(userService);
+            assertThat(response.get("error")).isEqualTo("Admin privileges required");
+        }
+
+        @Test
+        @DisplayName("Given an unauthenticated user, when readUser is called, then UNAUTHORIZED is returned.")
+        public void test_readUser_WhenUserIsUnauthenticated_ShouldReturnUnauthorized() throws Exception {
+            // GIVEN
+
+            // WHEN
+            Map response = getMvcResultWithUnauthenticatedUser(
+                    null,
+                    UserRoleEnum.USER,
+                    MockMvcResultMatchers.status().isUnauthorized());
+
+            // THEN
+            verifyNoInteractions(userService);
+            assertThat(response.get("error")).isEqualTo("Authentication required");
         }
     }
 
