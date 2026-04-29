@@ -69,8 +69,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .orElseThrow(() -> new RuntimeException("User not found: " + username));
 
             List<SimpleGrantedAuthority> authorities = Collections.singletonList(
-                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name()) // Exemple : "ROLE_ADMIN" ou "ROLE_USER"
-            );
+                    new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                     user,
                     null,

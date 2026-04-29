@@ -8,8 +8,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.ReportingPolicy;
 
-@Mapper(componentModel = "spring",
-        unmappedTargetPolicy = ReportingPolicy.ERROR)
+@Mapper(componentModel = "spring", unmappedTargetPolicy = ReportingPolicy.ERROR)
 public interface UserDtoMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "created_at", ignore = true)
@@ -23,7 +22,6 @@ public interface UserDtoMapper {
     @Mapping(target = "created_at", ignore = true)
     @Mapping(target = "updated_at", ignore = true)
     @Mapping(target = "authorities", ignore = true)
-    @Mapping(target = "role", ignore = true)
     User toEntity(AddUserRequestDTO addUserRequestDTO);
 
     // Mapping for 'AddUserRequestDTO', similar to 'RegisterDTO'
@@ -31,6 +29,5 @@ public interface UserDtoMapper {
     @Mapping(target = "created_at", ignore = true)
     @Mapping(target = "updated_at", ignore = true)
     @Mapping(target = "authorities", ignore = true)
-    @Mapping(target = "role", ignore = true)
     User toEntity(UpdateRequestDTO updateRequestDTO);
 }

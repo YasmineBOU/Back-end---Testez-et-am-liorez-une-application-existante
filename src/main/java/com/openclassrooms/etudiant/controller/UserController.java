@@ -32,30 +32,27 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping
 @RequiredArgsConstructor
 public class UserController {
-    
+
     private final UserService userService;
     private final UserDtoMapper userDtoMapper;
 
-
-    private ResponseEntity<?> userIsAuthenticated(User authenticatedUser) {
+    public ResponseEntity<?> userIsAuthenticated(User authenticatedUser) {
         // Check if the authenticated user is present in the security context
         if (authenticatedUser == null) {
             log.info("Authentication context missing");
             return new ResponseEntity<>(
-                Map.of("error", "Authentication required"),
-                HttpStatus.UNAUTHORIZED
-            );
-        
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED);
+
         }
         log.info("\nRole of authenticated user '{}': '{}'", authenticatedUser.getLogin(), authenticatedUser.getRole());
         // Only ADMIN users can perform user management operations
         if (authenticatedUser.getRole() != UserRoleEnum.ADMIN) {
             log.info("User '{}' does not have admin privileges", authenticatedUser.getLogin());
             return new ResponseEntity<>(
-                Map.of("error", "Admin privileges required"),
-                HttpStatus.FORBIDDEN
-            );
-            
+                    Map.of("error", "Admin privileges required"),
+                    HttpStatus.FORBIDDEN);
+
         }
         return null; // indicates authentication is valid
     }
@@ -72,12 +69,12 @@ public class UserController {
         log.info("Token: '{}'", jwtToken);
         return ResponseEntity.ok(Map.of("token", jwtToken, "message", "Logged successfully !"));
     }
+
     @PostMapping("/api/add-user")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> addUser(
             @Valid @RequestBody AddUserRequestDTO addUserRequestDTO,
-            @AuthenticationPrincipal User authenticatedUser
-    ) {
+            @AuthenticationPrincipal User authenticatedUser) {
         ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
         try {
             // Validate authenticated user exists
@@ -85,7 +82,7 @@ public class UserController {
                 return authResponse;
             }
             log.info("Authenticated user: {}", authenticatedUser.getLogin());
-            
+
             // Map DTO to entity
             User newUser = userDtoMapper.toEntity(addUserRequestDTO);
             log.info("Adding new user with login: {}", newUser.getLogin());
@@ -94,37 +91,32 @@ public class UserController {
             log.info("User '{}' added successfully with ID: {}", createdUser.getLogin(), createdUser.getId());
             // Return success response (201 Created)
             return new ResponseEntity<>(
-                Map.of(
-                    "message", "User created successfully",
-                    "userId", createdUser.getId(),
-                    "login", createdUser.getLogin()
-                ),
-                HttpStatus.CREATED
-            );
-            
+                    Map.of(
+                            "message", "User created successfully",
+                            "userId", createdUser.getId(),
+                            "login", createdUser.getLogin()),
+                    HttpStatus.CREATED);
+
         } catch (IllegalArgumentException e) {
             // Handles: duplicate login
             log.info("(Duplicate login)Error adding user: {}", e.getMessage());
             return new ResponseEntity<>(
-                Map.of("error", e.getMessage()),
-                HttpStatus.BAD_REQUEST
-            );
+                    Map.of("error", e.getMessage()),
+                    HttpStatus.BAD_REQUEST);
         } catch (IllegalStateException e) {
             // Handles: missing authentication context
             log.info("(Missing authentication context) Error adding user: {}", e.getMessage());
             return new ResponseEntity<>(
-                Map.of("error", "Authentication required"),
-                HttpStatus.UNAUTHORIZED
-            );
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED);
         }
     }
 
     @GetMapping("/api/read-user")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> readUser(
-        @AuthenticationPrincipal User authenticatedUser
-    ) {
-          
+            @AuthenticationPrincipal User authenticatedUser) {
+
         try {
             // Validate authenticated user exists
             ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
@@ -138,19 +130,17 @@ public class UserController {
             // Handles: missing authentication context
             log.info("(Missing authentication context) Error reading users: {}", e.getMessage());
             return new ResponseEntity<>(
-                Map.of("error", "Authentication required"),
-                HttpStatus.UNAUTHORIZED
-            );
-        }        
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED);
+        }
     }
 
     @GetMapping("/api/read-user/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> readUserById(
-        @AuthenticationPrincipal User authenticatedUser,
-        @PathVariable Long id
-    ) {
-          
+            @AuthenticationPrincipal User authenticatedUser,
+            @PathVariable Long id) {
+
         try {
             // Validate authenticated user exists
             ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
@@ -165,64 +155,79 @@ public class UserController {
             // Handles: missing authentication context
             log.info("(Missing authentication context) Error reading users: {}", e.getMessage());
             return new ResponseEntity<>(
-                Map.of("error", "Authentication required"),
-                HttpStatus.UNAUTHORIZED
-            );
-        }        
+                    Map.of("error", "Authentication required"),
+                    HttpStatus.UNAUTHORIZED);
+        }
     }
-    
+
+    // @DeleteMapping("/api/delete-user/{id}")
+    // @PreAuthorize("isAuthenticated()")
+    // public ResponseEntity<?> deleteUserById(
+    // @AuthenticationPrincipal User authenticatedUser,
+    // @PathVariable Long id) {
+
+    // try {
+    // // Validate authenticated user exists
+    // ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+    // if (authResponse != null) {
+    // return authResponse;
+    // }
+
+    // log.info("Searching for user with id: {}", id);
+    // userService.deleteUser(authenticatedUser, id);
+    // return new ResponseEntity<>(Map.of("message", "User with id " + id + "
+    // deleted successfully !"),
+    // HttpStatus.OK);
+    // } catch (IllegalStateException e) {
+    // // Handles: missing authentication context
+    // log.info("(Missing authentication context) Error deleting user: {}",
+    // e.getMessage());
+    // return new ResponseEntity<>(
+    // Map.of("error", "Error deleting user: " + e.getMessage()),
+    // HttpStatus.NOT_FOUND);
+    // }
+    // }
     @DeleteMapping("/api/delete-user/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> deleteUserById(
-        @AuthenticationPrincipal User authenticatedUser,
-        @PathVariable Long id
-    ) {
-          
-        try {
-            // Validate authenticated user exists
-            ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
-            if (authResponse != null) {
-                return authResponse;
-            }
+            @AuthenticationPrincipal User authenticatedUser,
+            @PathVariable Long id) {
 
-            log.info("Searching for user with id: {}", id);
-            userService.deleteUserById(authenticatedUser, id);
-            return new ResponseEntity<>(Map.of("message", "User with id " + id + " deleted successfully !"), HttpStatus.OK);
-        } catch (IllegalStateException e) {
-            // Handles: missing authentication context
-            log.info("(Missing authentication context) Error deleting user: {}", e.getMessage());
-            return new ResponseEntity<>(
-                Map.of("error", "Error deleting user: " + e.getMessage()),
-                HttpStatus.NOT_FOUND
-            );
-        }        
+        // Validate authenticated user exists
+        ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+        if (authResponse != null) {
+            return authResponse;
+        }
+
+        log.info("Searching for user with id: {}", id);
+        userService.deleteUser(authenticatedUser, id);
+        return new ResponseEntity<>(Map.of("message", "User with id " + id + " deleted successfully !"),
+                HttpStatus.OK);
+
     }
-    
+
     @PutMapping("/api/update-user/{id}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> updateUser(
-        @Valid @RequestBody UpdateRequestDTO updateRequestDTO,
-        @PathVariable Long id,
-        @AuthenticationPrincipal User authenticatedUser
-        
+            @Valid @RequestBody UpdateRequestDTO updateRequestDTO,
+            @PathVariable Long id,
+            @AuthenticationPrincipal User authenticatedUser
+
     ) {
-          
-        try {
-            // Validate authenticated user exists
-            ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
-            if (authResponse != null) {
-                return authResponse;
-            }
-            log.info("Updating user with id: {}", id);
-            userService.updateUser(authenticatedUser, id, updateRequestDTO);
-            return new ResponseEntity<>(Map.of("message", "User with id " + id + " updated successfully !"), HttpStatus.OK);
-        } catch (IllegalStateException e) {
-            // Handles: missing authentication context
-            log.info("(Missing authentication context) Error updating user: {}", e.getMessage());
-            return new ResponseEntity<>(
-                Map.of("error", "Error updating user: " + e.getMessage()),
-                HttpStatus.NOT_FOUND
-            );
-        }        
+
+        // Validate authenticated user exists
+        ResponseEntity<?> authResponse = userIsAuthenticated(authenticatedUser);
+        if (authResponse != null) {
+            return authResponse;
+        }
+        log.info("Updating user with id: {}", id);
+        userService.updateUser(
+                authenticatedUser,
+                id,
+                userDtoMapper.toEntity(updateRequestDTO));
+        return new ResponseEntity<>(Map.of(
+                "message", "User with id " + id + " updated successfully !"),
+                HttpStatus.OK);
+
     }
 }
