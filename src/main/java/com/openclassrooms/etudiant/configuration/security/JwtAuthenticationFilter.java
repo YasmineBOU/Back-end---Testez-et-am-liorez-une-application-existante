@@ -35,8 +35,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             @org.springframework.lang.NonNull HttpServletResponse response,
             @org.springframework.lang.NonNull FilterChain filterChain) throws ServletException, IOException {
 
-        log.info("JwtAuthenticationFilter executing for: {} {}", request.getMethod(), request.getRequestURI());
-
         final String authHeader = request.getHeader("Authorization");
         final String tokenPrefix = "Bearer ";
 
@@ -46,10 +44,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // Check if Authorization header is present and starts with Bearer
         if (authHeader != null && authHeader.startsWith(tokenPrefix)) {
             jwtToken = authHeader.substring(tokenPrefix.length());
-            log.info("Found JWT token in request");
             try {
                 usernameTemp = jwtService.validateTokenAndGetUsername(jwtToken);
-                log.info("Token validated for user: {}", usernameTemp);
             } catch (RuntimeException e) {
                 log.warn("Invalid JWT token: {}", e.getMessage());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -79,7 +75,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // Set authenticated user in security context
             SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-            log.info("User {} authenticated successfully", username);
         }
         filterChain.doFilter(request, response);
     }

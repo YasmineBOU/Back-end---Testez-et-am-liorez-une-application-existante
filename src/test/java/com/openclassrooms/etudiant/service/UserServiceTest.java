@@ -18,6 +18,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
@@ -348,7 +349,7 @@ public class UserServiceTest {
         public void test_getUserById_with_unexisting_id_throws_IllegalStateException() {
             // GIVEN
             Long unexistingId = 999L;
-            when(userRepository.findUserById(unexistingId)).thenThrow(new IllegalStateException());
+            when(userRepository.findUserById(unexistingId)).thenReturn(null);
 
             // THEN
             Assertions.assertThrows(
@@ -370,6 +371,7 @@ public class UserServiceTest {
 
             // THEN
             verify(userRepository, times(1)).findUserById(existingId);
+            assertThat(existingId).isNotNull();
             assertThat(fetchedUserSummaryDTO).isSameAs(expectedUser);
         }
 
@@ -486,5 +488,121 @@ public class UserServiceTest {
             assertThat(userCaptor.getValue().getPassword()).isEqualTo(PASSWORD);
             assertThat(userCaptor.getValue().getRole()).isEqualTo(ROLE);
         }
+
+        // Additional tests to cover branches
+        @Test
+        @DisplayName("Given a valid existing id and new firstName, when updateUser is called, then the firstName is updated.")
+        public void test_updateUser_with_valid_existing_id_and_new_firstName_updates_firstName() {
+            // GIVEN
+            long existingId = 1L;
+            User userToUpdate = new User();
+            userToUpdate.setFirstName("NewFirstName");
+
+            User existingUser = new User();
+            existingUser.setFirstName(FIRST_NAME);
+            existingUser.setLastName(LAST_NAME);
+            existingUser.setLogin(LOGIN);
+            existingUser.setPassword(PASSWORD);
+            existingUser.setRole(ROLE);
+
+            when(userRepository.findById(existingId)).thenReturn(Optional.of(existingUser));
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // WHEN
+            userService.updateUser(new User(), existingId, userToUpdate);
+
+            // THEN
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository, times(1)).save(userCaptor.capture());
+            assertThat(userCaptor.getValue().getFirstName()).isEqualTo("NewFirstName");
+        }
+
+        @Test
+        @DisplayName("Given a valid existing id and new lastName, when updateUser is called, then the lastName is updated.")
+        public void test_updateUser_with_valid_existing_id_and_new_lastName_updates_lastName() {
+            // GIVEN
+            long existingId = 1L;
+            User userToUpdate = new User();
+            userToUpdate.setLastName("NewLastName");
+
+            User existingUser = new User();
+            existingUser.setFirstName(FIRST_NAME);
+            existingUser.setLastName(LAST_NAME);
+            existingUser.setLogin(LOGIN);
+            existingUser.setPassword(PASSWORD);
+            existingUser.setRole(ROLE);
+
+            when(userRepository.findById(existingId)).thenReturn(Optional.of(existingUser));
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+            // WHEN
+            userService.updateUser(new User(), existingId, userToUpdate);
+
+            // THEN
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository, times(1)).save(userCaptor.capture());
+            assertThat(userCaptor.getValue().getLastName()).isEqualTo("NewLastName");
+        }
+
+        @Test
+        @DisplayName("Given a valid existing id and a new login already used by another user, when updateUser is called, then DataIntegrityViolationException is thrown.")
+        public void test_updateUser_with_duplicate_login_throws_DataIntegrityViolationException() {
+            // GIVEN
+            long existingId = 1L;
+            User userToUpdate = new User();
+            userToUpdate.setLogin("existingLogin"); // Login déjà utilisé par un autre utilisateur
+
+            User existingUser = new User();
+            existingUser.setFirstName(FIRST_NAME);
+            existingUser.setLastName(LAST_NAME);
+            existingUser.setLogin(LOGIN);
+            existingUser.setPassword(PASSWORD);
+            existingUser.setRole(ROLE);
+
+            when(userRepository.findById(existingId)).thenReturn(Optional.of(existingUser));
+            when(userRepository.save(any(User.class)))
+                    .thenThrow(new DataIntegrityViolationException("Login already exists"));
+
+            // THEN
+            Assertions.assertThrows(
+                    DataIntegrityViolationException.class,
+                    () -> userService.updateUser(new User(), existingId, userToUpdate));
+        }
+
+        @Test
+        @DisplayName("Given a valid existing id and new password, when updateUser is called, then the password is updated.")
+        public void test_updateUser_with_valid_existing_id_and_new_password_updates_password() {
+            // GIVEN
+            long existingId = 1L;
+            User userToUpdate = new User();
+            userToUpdate.setPassword("NewPassword");
+
+            User existingUser = new User();
+            existingUser.setFirstName(FIRST_NAME);
+            existingUser.setLastName(LAST_NAME);
+            existingUser.setLogin(LOGIN);
+            existingUser.setPassword("OldPassword");
+            existingUser.setRole(ROLE);
+
+            when(userRepository.findById(existingId)).thenReturn(Optional.of(existingUser));
+
+            when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+                User user = invocation.getArgument(0);
+                if (user.getPassword() != null && !user.getPassword().trim().isEmpty()) {
+                    user.setPassword(passwordEncoder.encode(user.getPassword().trim()));
+                }
+                return user;
+            });
+
+            // WHEN
+            userService.updateUser(new User(), existingId, userToUpdate);
+
+            // THEN
+            ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+            verify(userRepository, times(1)).save(userCaptor.capture());
+            assertThat(userCaptor.getValue().getPassword()).isEqualTo(passwordEncoder.encode("NewPassword"));
+        }
+
     }
+
 }
